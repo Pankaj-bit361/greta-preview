@@ -498,7 +498,7 @@ app.get("/", (req, res) => {
   res.json({ message: 'Welcome to Preview Server' });
 });
 
-const port = 5000;
+const port = 5005;
 app.listen(port, () => {
   log(`Preview server running on port ${port}`);
 });
