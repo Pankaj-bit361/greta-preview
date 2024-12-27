@@ -524,9 +524,10 @@ app.use((req, res) => {
   });
 });
 
-app.get("/",(req,res)=>{
-  res.status.json('welcome to greta')
-})
+
+app.get("/", (req, res) => {
+  res.json({ message: 'Welcome to Greta Preview' });
+});
 
 initializeBaseTemplate()
   .then(() => {
