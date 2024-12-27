@@ -524,6 +524,10 @@ app.use((req, res) => {
   });
 });
 
+app.get("/",(req,res)=>{
+  res.status.json('welcome to greta')
+})
+
 initializeBaseTemplate()
   .then(() => {
     const port = 5000;
