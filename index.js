@@ -7,12 +7,6 @@ const cors = require("cors");
 
 function log(message, type = "info", error = null) {
   const timestamp = new Date().toISOString();
-  // const logMessage = {
-  //   timestamp,
-  //   type,
-  //   message,
-  //   ...(error && { error: error.message, stack: error.stack }),
-  // };
   console.log(JSON.stringify(message, null, 2));
 }
 
@@ -22,13 +16,11 @@ const app = express();
 app.use(express.json({ limit: "50mb" }));
 app.use(cors());
 
-const BASE_TEMPLATE_DIR = path.join(__dirname, "template");
 const PREVIEW_DIR = path.join(__dirname, "previews");
 const PUBLIC_DIR = path.join(__dirname, "public");
 
 try {
   fs.ensureDirSync(PREVIEW_DIR);
-  fs.ensureDirSync(BASE_TEMPLATE_DIR);
   fs.ensureDirSync(PUBLIC_DIR);
   log("Directories initialized successfully");
 } catch (error) {
@@ -44,6 +36,165 @@ async function verifyBuildArtifacts(buildPath, requiredFiles = ['index.html']) {
     if (!exists) {
       throw new Error(`Required build artifact not found: ${file}`);
     }
+  }
+}
+
+async function createTemplateFiles(sitePath) {
+  const baseFiles = {
+    "index.html": `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preview</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>`,
+
+    "src/main.tsx": `import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import App from './App';
+import './styles.css';
+
+const root = document.getElementById('root');
+if (root) {
+  createRoot(root).render(
+    <StrictMode>
+      <App />
+    </StrictMode>
+  );
+}`,
+
+    "src/App.tsx": `import React from 'react';
+
+function App() {
+  return (
+    <div className="min-h-screen bg-gray-100 p-8">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl font-bold mb-4">Welcome to the App</h1>
+      </div>
+    </div>
+  );
+}
+
+export default App;`,
+
+    "src/styles.css": `@tailwind base;
+@tailwind components;
+@tailwind utilities;`,
+
+    "package.json": JSON.stringify(
+      {
+        name: "preview",
+        private: true,
+        version: "0.0.0",
+        type: "module",
+        scripts: {
+          dev: "vite",
+          build: "tsc && vite build",
+          preview: "vite preview",
+        },
+        dependencies: {
+          react: "^18.2.0",
+          "react-dom": "^18.2.0",
+          "react-router-dom": "^6.21.1",
+          "lucide-react": "^0.303.0",
+        },
+        devDependencies: {
+          "@types/react": "^18.2.48",
+          "@types/react-dom": "^18.2.18",
+          "@vitejs/plugin-react": "^4.2.1",
+          typescript: "^5.3.3",
+          vite: "^5.0.12",
+          autoprefixer: "^10.4.17",
+          postcss: "^8.4.33",
+          tailwindcss: "^3.4.1",
+        },
+      },
+      null,
+      2
+    ),
+
+    "postcss.config.js": `export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}`,
+
+    "tailwind.config.js": `/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}`,
+
+    "tsconfig.json": JSON.stringify(
+      {
+        compilerOptions: {
+          target: "ESNext",
+          lib: ["DOM", "DOM.Iterable", "ESNext"],
+          module: "ESNext",
+          skipLibCheck: true,
+          moduleResolution: "bundler",
+          allowImportingTsExtensions: true,
+          resolveJsonModule: true,
+          isolatedModules: true,
+          noEmit: true,
+          jsx: "react-jsx",
+          strict: true,
+          noUnusedLocals: true,
+          noUnusedParameters: true,
+          noFallthroughCasesInSwitch: true,
+        },
+        include: ["src"],
+        references: [{ path: "./tsconfig.node.json" }],
+      },
+      null,
+      2
+    ),
+
+    "tsconfig.node.json": JSON.stringify(
+      {
+        compilerOptions: {
+          composite: true,
+          skipLibCheck: true,
+          module: "ESNext",
+          moduleResolution: "bundler",
+          allowSyntheticDefaultImports: true,
+        },
+        include: ["vite.config.ts"],
+      },
+      null,
+      2
+    ),
+
+    "vite.config.ts": `import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  base: './',
+  build: {
+    outDir: 'dist',
+    sourcemap: true
+  }
+});`,
+  };
+
+  for (const [filePath, content] of Object.entries(baseFiles)) {
+    const fullPath = path.join(sitePath, filePath);
+    await fs.ensureDir(path.dirname(fullPath));
+    await fs.writeFile(fullPath, content);
+    log(`Created template file: ${filePath}`);
   }
 }
 
@@ -106,177 +257,6 @@ async function createPreview(sitePath, id) {
   }
 }
 
-// Template files remain the same as in your original code
-const baseFiles = {
-  "index.html": `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Preview</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>`,
-
-  "src/main.tsx": `import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
-import App from './App';
-import './styles.css';
-
-const root = document.getElementById('root');
-if (root) {
-  createRoot(root).render(
-    <StrictMode>
-      <App />
-    </StrictMode>
-  );
-}`,
-
-  "src/App.tsx": `import React from 'react';
-
-function App() {
-  return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-4">Welcome to the App</h1>
-      </div>
-    </div>
-  );
-}
-
-export default App;`,
-
-  "src/styles.css": `@tailwind base;
-@tailwind components;
-@tailwind utilities;`,
-
-  "package.json": JSON.stringify(
-    {
-      name: "preview",
-      private: true,
-      version: "0.0.0",
-      type: "module",
-      scripts: {
-        dev: "vite",
-        build: "tsc && vite build",
-        preview: "vite preview",
-      },
-      dependencies: {
-        react: "^18.2.0",
-        "react-dom": "^18.2.0",
-        "react-router-dom": "^6.21.1",
-        "lucide-react": "^0.303.0",
-      },
-      devDependencies: {
-        "@types/react": "^18.2.48",
-        "@types/react-dom": "^18.2.18",
-        "@vitejs/plugin-react": "^4.2.1",
-        typescript: "^5.3.3",
-        vite: "^5.0.12",
-        autoprefixer: "^10.4.17",
-        postcss: "^8.4.33",
-        tailwindcss: "^3.4.1",
-      },
-    },
-    null,
-    2
-  ),
-
-  "postcss.config.js": `export default {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-}`,
-
-  "tailwind.config.js": `/** @type {import('tailwindcss').Config} */
-export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
-  theme: {
-    extend: {},
-  },
-  plugins: [],
-}`,
-
-  "tsconfig.json": JSON.stringify(
-    {
-      compilerOptions: {
-        target: "ESNext",
-        lib: ["DOM", "DOM.Iterable", "ESNext"],
-        module: "ESNext",
-        skipLibCheck: true,
-        moduleResolution: "bundler",
-        allowImportingTsExtensions: true,
-        resolveJsonModule: true,
-        isolatedModules: true,
-        noEmit: true,
-        jsx: "react-jsx",
-        strict: true,
-        noUnusedLocals: true,
-        noUnusedParameters: true,
-        noFallthroughCasesInSwitch: true,
-      },
-      include: ["src"],
-      references: [{ path: "./tsconfig.node.json" }],
-    },
-    null,
-    2
-  ),
-
-  "tsconfig.node.json": JSON.stringify(
-    {
-      compilerOptions: {
-        composite: true,
-        skipLibCheck: true,
-        module: "ESNext",
-        moduleResolution: "bundler",
-        allowSyntheticDefaultImports: true,
-      },
-      include: ["vite.config.ts"],
-    },
-    null,
-    2
-  ),
-
-  "vite.config.ts": `import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-
-export default defineConfig({
-  plugins: [react()],
-  base: './',
-  build: {
-    outDir: 'dist',
-    sourcemap: true
-  }
-});`,
-};
-
-async function initializeBaseTemplate() {
-  try {
-    log("Initializing base template");
-    
-    for (const [filePath, content] of Object.entries(baseFiles)) {
-      const fullPath = path.join(BASE_TEMPLATE_DIR, filePath);
-      await fs.ensureDir(path.dirname(fullPath));
-      await fs.writeFile(fullPath, content);
-      log(`Created template file: ${filePath}`);
-    }
-    
-    log("Installing base dependencies");
-    await execAsync("npm install", { cwd: BASE_TEMPLATE_DIR });
-    log("Base template initialized successfully");
-  } catch (error) {
-    log("Failed to initialize base template", "error", error);
-    throw error;
-  }
-}
-
 function debugLog(message) {
   console.log('\n=== DEBUG LOG ===');
   console.log(message);
@@ -302,8 +282,9 @@ app.post("/api/preview/create", async (req, res) => {
     await fs.ensureDir(previewPath);
     log(`Created preview directory: ${previewPath}`);
 
-    await fs.copy(BASE_TEMPLATE_DIR, previewPath);
-    log("Copied template files");
+    // Create template files directly in the preview directory
+    await createTemplateFiles(previewPath);
+    log("Created template files");
 
     const createdPaths = [];
 
@@ -323,7 +304,6 @@ app.post("/api/preview/create", async (req, res) => {
       } else if (file.type === "file") {
         await fs.ensureDir(path.dirname(filePath));
         
-        // Only process content if it exists
         if (file.content !== undefined && file.content !== null) {
           let content = file.content;
           if (typeof content === 'string' && content.startsWith("```")) {
@@ -334,7 +314,6 @@ app.post("/api/preview/create", async (req, res) => {
           createdPaths.push(filePath);
           log(`Created file: ${file.path}`);
         } else {
-          // Create an empty file if no content is provided
           await fs.writeFile(filePath, '');
           createdPaths.push(filePath);
           log(`Created empty file: ${file.path}`);
@@ -342,7 +321,6 @@ app.post("/api/preview/create", async (req, res) => {
       }
     };
 
-    // Process all files
     for (const file of files) {
       try {
         await processFile(file, previewPath);
@@ -358,7 +336,6 @@ app.post("/api/preview/create", async (req, res) => {
 
     const previewResult = await createPreview(previewPath, id);
 
-    // After successful preview creation, cleanup only the preview directory
     try {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
@@ -472,7 +449,7 @@ app.get('/api/preview/files/:id', async (req, res) => {
 
 app.get('/api/debug/preview/:id', async (req, res) => {
   const { id } = req.params;
-  log(id)
+  log(id);
   const previewPath = path.join(PUBLIC_DIR, id);
   const indexPath = path.join(previewPath, 'index.html');
   
@@ -517,28 +494,13 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.use((req, res) => {
-  res.status(404).json({
-    error: "Not found",
-    message: `Route ${req.method} ${req.path} not found`,
-  });
-});
-
-
 app.get("/", (req, res) => {
-  res.json({ message: 'Welcome to Greta Preview' });
+  res.json({ message: 'Welcome to Preview Server' });
 });
 
-initializeBaseTemplate()
-  .then(() => {
-    const port = 5000;
-    app.listen(port, () => {
-      log(`Preview server running on port ${port}`);
-    });
-  })
-  .catch((err) => {
-    log("Failed to initialize base template", "error", err);
-    process.exit(1);
-  });
+const port = 5000;
+app.listen(port, () => {
+  log(`Preview server running on port ${port}`);
+});
 
 module.exports = app;
